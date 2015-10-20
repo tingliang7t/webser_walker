@@ -14,11 +14,13 @@
 #include <sys/epoll.h>
 #include <sys/types.h>
 #include <ctype.h>
+#include <dirent.h>
 
 extern struct config walkerconf[];
 extern int epollfd;
 
 #define MAXLINE     65535
+#define LINE        1024
 #define MAXURL      4096
 #define MAXQUERY    4096
 
@@ -28,6 +30,9 @@ void http_handle(int client, threadpool_t *tpool, int epollfd)
     epoll_ctl(epollfd, EPOLL_CTL_DEL, client, NULL);
 
 }
+
+
+
 
 /*@ http_getline:
  *@   get a line from port, return a number read in the line.
@@ -66,12 +71,18 @@ int http_getline(int fd, char *buf, int size)
     return i;
 }
 
+
+
+
+
+
 /*@ http_analyze:
  *@      get request method, quering, url, http version, etc.
  *@
  *@
  *@
  */
+ /*
 int http_analy(int fd)
 {
     char    buf[1024];
@@ -139,7 +150,7 @@ int http_analy(int fd)
         }
     }
 }
-
+*/
 
 /*@http_analyze:
  *@    http_analy* version 2
@@ -166,7 +177,7 @@ int http_analyze(int cfd, threadpool_t *tpool)
     
     sscanf(line, "%s %s %s", method, url, version);
 
-    if (strncasecmp(method, "GET") !=0 && strncasecmp(method, "POST") !=0){
+    if (strncasecmp(method, "GET", 3) !=0 && strncasecmp(method, "POST", 4) !=0){
         http_not_support(cfd);
         return 0;
     }
@@ -180,7 +191,7 @@ int http_analyze(int cfd, threadpool_t *tpool)
         strncpy(query, pos, strlen(pos)+1);
     } 
 
-    if (strncasecmp(method, "GET")==0){
+    if (strncasecmp(method, "GET", 3)==0){
         char *filepath;
         filepath = (char *)malloc(strlen(walkerconf[ROOT].value)+strlen(url)+1);
         strcpy(filepath, walkerconf[ROOT].value);
@@ -193,18 +204,31 @@ int http_analyze(int cfd, threadpool_t *tpool)
             return 0;
         }
 
+        if (access(filepath, R_OK | X_OK)){
+            http_error(cfd);
+            return 0;
+        }
+
         if ((S_ISDIR(st.st_mode) || S_ISREG(st.st_mode)) && !iscgi){ 
             struct http_job* job = http_make_job(cfd, filepath);
             threadpool_add(tpool, http_thread_work, (void*)job, 0);
             return 0;
+        }else if (S_ISREG(st.st_mode) && iscgi){
+            
         }else{
             http_error(cfd);
             return 0;
         }         
+    }else if (strncasecmp(method, "POST", 4) == 0){
+         
     }
-
-
+    
+    return 0;
 }
+
+
+
+
 
 /*@ http_make_job:
  *@     init a struct http_job with fd and filepath. This struct
@@ -219,6 +243,8 @@ struct http_job* http_make_job(int fd, char *filepath)
     strcpy(job->filepath, filepath);
     return job;
 }
+
+
 
 /*@ http_thread_work:
  *@             
@@ -252,45 +278,88 @@ void http_thread_work(void *arg)
 }
 
 
-    
+
+
+
+/*@ http_not_support
+ *@ http_not_found
+ *@ http_error
+ */
+ 
 int http_not_support(int client)
 {
+    http_send(client, "HTTP/1.1 400 NoFoundation\r\n");
+    http_send(client, "Content-Type: text/html\r\n");
+    http_send(client, "\r\n");
+    http_send(client, "<HTML><TITLE>NOT SUPPORT</TITLE>");
+    http_send(client, "<BODY>Walker server do not support the mothod you request.</BODY></HTML>");
+    
+    return 0;
+
 }
+
 
 int http_not_found(int client)
 {
-    http_send(client, "HTTP/1.1 404 Not Foundation\r\n");
+    http_send(client, "HTTP/1.1 404 NotFoundation\r\n");
     http_send(client, "Content-Type: text/html\r\n");
     http_send(client, "\r\n");
-    http_send(client, "<HTML><TITLE>Not Foundation</TITLE>\r\n");
-    http_send(client, "<BODY><P>The server could not fullfill your request.\r\n");
-    http_send(client, "Because the resource specified is unavailable or not exit\r\n");
+    http_send(client, "<HTML><TITLE>Not Foundation</TITLE>");
+    http_send(client, "<BODY><p>The server could not fullfill your request.");
+    http_send(client, "Because the resource specified is unavailable or not exit");
     http_send(client, "</p></BODY></HTML>");
     
     return 0;
 }
 
 
-
-void http_mk_header(int client)
+int http_error(int client)
 {
-    http_send(client, "HTTP/1.1 200 OK\r\n");
+    http_send(client, "HTTP/1.1 Bad Request\r\n");
+    http_send(client, "Content-Type: text/html\r\n");
+    http_send(client, "\r\n");
+    http_send(client, "<HTML><TITLE>Bad Request</TITLE>");
+    http_send(client, "<BODY>The resource can't be retrived</BODY></HTML>");
+
+    return 0;
+}
+
+
+
+
+
+
+
+
+
+
+void http_mk_header(int client, int status, char *phrase)
+{
+    char buf[MAXLINE];
+    sprintf(buf, "HTTP/1.1 %d %s\r\n", status, phrase);
+    http_send(client, buf);
     http_send(client, "Content-Type: text/html\r\n");
     http_send(client, "\r\n");
 }
 
+
 int http_send(int client, char *s)
 {
-    char buf[1024];
-    strcpy(buf, s);
-    return send(client, buf, strlen(buf), 0);   
+    char buf[MAXLINE];
+    strncpy(buf, s, MAXLINE);
+    return send(client, buf, strlen(buf)+1, 0);   
+
 }
 
-int http_sendfile(int client, char *filepath)
+int http_send_file(int client, char *filepath)
 {
     char buf[MAXLINE];
     FILE *f = fopen(filepath, "r");
 
+    http_send(client, "HTTP/1.1 200 OK\r\n");
+    http_send(client, "Content-Type: text/html\r\n");
+    http_send(client, "\r\n");
+    
     fgets(buf, MAXLINE, f);
     while(!feof(f)){
         send(client, buf, strlen(buf), 0);
@@ -300,4 +369,28 @@ int http_sendfile(int client, char *filepath)
     return 0;
 }
 
+int http_show_dir(int client, char *filepath)
+{
+    DIR *dp;
+    struct dirent *dirp; struct stat st;
+    struct passwd *filepasswd;
+    int num = 1;
+    char files[MAXLINE], buf[LINE], name[LINE], img[LINE], mtime[LINE], dir[LINE];
+    char *p;
+
+    p = strrchr(filepath, '/');
+    ++p;
+    strcpy(dir, p);
+    strcat(dir, "/");
+
+    if ((dp =opendir(filepath))== NULL){
+        http_error(client);
+        return -1;
+    }
+
+    sprintf (files, "<HTML><TITLE>Dir Browser</TITLE>");
+    sprintf (files, "%s<style type = ""text/css""> a:link{text-decoration:none;} </style>", files);
+    sprintf (files, "%s<body bgcolor=""ffffff"" font-family=Arial color=#fff font-size=14px}\r\n", files);
+
+}
 

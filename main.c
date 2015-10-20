@@ -9,7 +9,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <strings.h>
-#include <fcntl.h>IPv6
+#include <fcntl.h>
 #include <sys/epoll.h>
 extern struct walker walker;
 extern struct config walkerconf[];
