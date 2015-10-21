@@ -372,21 +372,31 @@ int http_send(int client, char *s)
 int http_send_file(int client, char *filepath)
 {
     char buf[MAXLINE];
+    char file[MAXLINE];
     FILE *f = fopen(filepath, "r");
     struct stat st;
     stat(filepath, &st);
-    sprintf (buf, "Content-length: %ld\r\n", st.st_size);
-    http_send(client, "HTTP/1.1 200 OK\r\n");
-    http_send(client, "Content-type: text/html\r\n");
-    http_send(client, buf);
-    http_send(client, "\r\n");
-    
+   /* 
     fgets(buf, MAXLINE, f);
     while(!feof(f)){
         send(client, buf, strlen(buf), 0);
         fgets(buf, MAXLINE, f);
     }
+    */
+
+    fgets(buf, MAXLINE, f);
+    sprintf (file, "%s", buf);
+    while(!feof(f)){
+        fgets(buf, MAXLINE, f);
+        sprintf(file, "%s%s", file, buf);
+    }
     
+    sprintf (buf, "Content-length: %ld\r\n", st.st_size);
+    http_send(client, "HTTP/1.1 200 OK\r\n");
+    http_send(client, "Content-type: text/html\r\n");
+    http_send(client, buf);
+    http_send(client, "\r\n");
+    http_send(client, file);
     return 0;
 }
 
@@ -431,24 +441,26 @@ int http_show_dir(int client, char *filepath)
             sprintf (img, "<img src=""sock.png"" width=""24px"" height=""24px"">");
         else 
             sprintf (img, "<img src=""file.png"" width=""24px"" height=""24px"">");
+    
 
-
-        sprintf (files, "%s<p><pre>%-2d %s ""<a href=%s%s"">%s-15s</a>%-10s%10d %24s</pre></p>\r\n", files, num++, img, dir, dirp->d_name, dirp->d_name, filepasswd->pw_name, (int)st.st_size, tmmodify(st.st_mode, mtime));
-
-        closedir(dp);
-        sprintf (files, "%s</BODY></HTML>", files);
-       
-        sprintf (buf, "HTTP/1.1 200 OK \r\n");
-        sprintf (buf, "%sServer: "SERVER"\r\n", buf);
-        sprintf (buf, "%sContent-length: %ld\r\n", buf, strlen(files));
-        sprintf (buf, "%sContent-type: text/html\r\n", buf);
-        sprintf (buf, "%s\r\n", buf);
-
-        http_send(client, buf);
-
+        sprintf (files, "%s<p><pre>%-2d %s ""<a href=%s%s"">%-15s</a>%-10s%10d %24s</pre></p>\r\n", files, num++, img, dir, dirp->d_name, dirp->d_name, filepasswd->pw_name, (int)st.st_size, tmmodify(st.st_mode, mtime));
     }
+    closedir(dp);
+    sprintf (files, "%s</BODY></HTML>", files);
+       
+    sprintf (buf, "HTTP/1.1 200 OK \r\n");
+    sprintf (buf, "%sServer: "SERVER"\r\n", buf);
+    sprintf (buf, "%sContent-length: %ld\r\n", buf, strlen(files));
+    sprintf (buf, "%sContent-type: text/html\r\n", buf);
+    sprintf (buf, "%s\r\n", buf);
+
+    http_send(client, buf);
+    http_send(client, files);
+
+    return 0; 
 
 }
+
 
 
 

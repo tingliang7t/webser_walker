@@ -229,6 +229,7 @@ void do_subprocess_job(int serfd)
                     continue;
                 ev.data.fd = clifd;
                 ev.events = EPOLLIN | EPOLLONESHOT;
+                //ev.events = EPOLLIN;
                 epoll_ctl(epollfd, EPOLL_CTL_ADD, clifd, &ev);
             }else if (ea[i].events & EPOLLIN){
                 http_handle(ea[i].data.fd, tpool, epollfd);             

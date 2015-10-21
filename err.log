@@ -60,3 +60,7 @@ Wed Oct 21 01:13:47 2015
 *****try root again
 Wed Oct 21 01:16:48 2015
 tcp_listen: bind failed
+Wed Oct 21 13:55:50 2015
+http_analyze ip:0.0.0.0 create an error connectionWed Oct 21 13:55:59 2015
+http_analyze ip:127.0.0.1 create an error connectionWed Oct 21 13:56:18 2015
+http_analyze ip:127.0.0.1 create an error connection
