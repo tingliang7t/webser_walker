@@ -38,4 +38,8 @@ void  job(void *arg);
 
 int user_accept(int);
 
+
+int getmonth(struct tm*);
+char *tmmodify(time_t, char *);
+
 #endif

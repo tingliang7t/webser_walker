@@ -184,10 +184,10 @@ int user_accept(int fd)
         return -1;
     }
     
-    char *ip = inet_ntoa(addr.sin_addr);
-    if (strcasecmp(ip, "0.0.0.0")==0){
-        return -1;
-    }
+    //char *ip = inet_ntoa(addr.sin_addr);
+    //if (strcasecmp(ip, "0.0.0.0")==0){
+    //    return -1;
+    //}
     return cli_fd;
 }
 
@@ -231,9 +231,42 @@ void do_subprocess_job(int serfd)
                 ev.events = EPOLLIN | EPOLLONESHOT;
                 epoll_ctl(epollfd, EPOLL_CTL_ADD, clifd, &ev);
             }else if (ea[i].events & EPOLLIN){
-                http_handle(ea[i].data.fd, tpool, epollfd); 
-                
+                http_handle(ea[i].data.fd, tpool, epollfd);             
             }
         }
     }
+}
+
+
+
+char *tmmodify(time_t timeval, char *time)
+{
+    char other[24];
+    char year[8];
+    int month;
+
+    struct tm * local = localtime(&timeval);
+
+    strftime(year, 7, "%Y", local);
+    month = getmonth(local);
+
+	strftime(other,23,"%d %H:%M:%S",local);
+	sprintf(time,"%s/%d/%s\r\n",year,month,other);
+	return time;
+}
+
+
+int getmonth(struct tm* local)   // return month index ,eg. Oct->10
+{
+	char buf[8];
+	int i;
+	static char *months[]={"Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sept","Oct","Nov","Dec"};
+
+	strftime(buf,127,"%b",local);
+	for(i=0;i<12;++i)
+	{
+		if(!strcmp(buf,months[i]))
+			return i+1;
+	}
+	return 0;
 }

@@ -31,7 +31,6 @@ int main (int argc, char* argv[])
     int nlisten = atoi(walkerconf[LISTENNUMBER].value);
     walker.fd = tcp_listen(port,/*address*/ NULL, nlisten);
 
-
     /*test if mutiprocess on*/
 
     if (strcasecmp(walkerconf[MUTIPROCESS].value, "on") == 0 &&(ret = atoi(walkerconf[PROCESSNUMBER].value)) >0){

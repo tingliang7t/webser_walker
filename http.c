@@ -14,6 +14,7 @@
 #include <sys/epoll.h>
 #include <sys/types.h>
 #include <ctype.h>
+#include <pwd.h>
 #include <dirent.h>
 
 extern struct config walkerconf[];
@@ -23,12 +24,15 @@ extern int epollfd;
 #define LINE        1024
 #define MAXURL      4096
 #define MAXQUERY    4096
+#define SERVER      "Walker"
 
 void http_handle(int client, threadpool_t *tpool, int epollfd)
 {
     http_analyze(client, tpool);
     epoll_ctl(epollfd, EPOLL_CTL_DEL, client, NULL);
-
+    //close(client);
+    if (strcasecmp(walkerconf[THREADNUMBER].value, "0") == 0)
+        shutdown(client, SHUT_RDWR);
 }
 
 
@@ -204,14 +208,15 @@ int http_analyze(int cfd, threadpool_t *tpool)
             return 0;
         }
 
-        if (access(filepath, R_OK | X_OK)){
+        if (access(filepath, R_OK)){
             http_error(cfd);
             return 0;
         }
 
         if ((S_ISDIR(st.st_mode) || S_ISREG(st.st_mode)) && !iscgi){ 
             struct http_job* job = http_make_job(cfd, filepath);
-            threadpool_add(tpool, http_thread_work, (void*)job, 0);
+            //threadpool_add(tpool, http_thread_work, (void*)job, 0);
+            http_thread_work((void*)job);
             return 0;
         }else if (S_ISREG(st.st_mode) && iscgi){
             
@@ -265,15 +270,18 @@ void http_thread_work(void *arg)
 
     if (S_ISDIR(st.st_mode)){
         http_show_dir(job->fd, job->filepath);
-        free(job);
-        return;
     }
     
     if (S_ISREG(st.st_mode)){
         http_send_file(job->fd, job->filepath);
-        free(job);
-        return;
     } 
+
+    if (strcasecmp(walkerconf[THREADNUMBER].value, "0")!=0)
+        close(job->fd);
+
+
+    free(job);
+    return ;
 
 }
 
@@ -288,11 +296,17 @@ void http_thread_work(void *arg)
  
 int http_not_support(int client)
 {
-    http_send(client, "HTTP/1.1 400 NoFoundation\r\n");
-    http_send(client, "Content-Type: text/html\r\n");
-    http_send(client, "\r\n");
-    http_send(client, "<HTML><TITLE>NOT SUPPORT</TITLE>");
-    http_send(client, "<BODY>Walker server do not support the mothod you request.</BODY></HTML>");
+   // http_send(client, "HTTP/1.1 400 NoFoundation\r\n");
+    //http_send(client, "Content-Type: text/html\r\n");
+    //http_send(client, "\r\n");
+    //http_send(client, "<HTML><TITLE>NOT SUPPORT</TITLE>");
+    //http_send(client, "<BODY>Walker server do not support the mothod you request.</BODY></HTML>");
+
+    http_send(client, "HTTP/1.1 400 NoFoundation\r\n"
+                      "Content-type: text/html\r\n"
+                      "\r\n"
+                      "<HTML><TITLE>Not Support</TITLE>"
+                      "<BODY>Walker server do not support the method you request.</BODY></HTML>");
     
     return 0;
 
@@ -301,13 +315,19 @@ int http_not_support(int client)
 
 int http_not_found(int client)
 {
-    http_send(client, "HTTP/1.1 404 NotFoundation\r\n");
-    http_send(client, "Content-Type: text/html\r\n");
-    http_send(client, "\r\n");
-    http_send(client, "<HTML><TITLE>Not Foundation</TITLE>");
-    http_send(client, "<BODY><p>The server could not fullfill your request.");
-    http_send(client, "Because the resource specified is unavailable or not exit");
-    http_send(client, "</p></BODY></HTML>");
+    //http_send(client, "HTTP/1.1 404 NotFoundation\r\n");
+    //http_send(client, "Content-Type: text/html\r\n");
+    //http_send(client, "\r\n");
+    //http_send(client, "<HTML><TITLE>Not Foundation</TITLE>");
+    //http_send(client, "<BODY><p>The server could not fullfill your request.");
+    //http_send(client, "Because the resource specified is unavailable or not exit");
+    //http_send(client, "</p></BODY></HTML>");
+    
+    http_send(client, "HTTP/1.1 404 Not Found\r\n"
+                      "Content-type: text/html\r\n"
+                      "\r\n"
+                      "<HTML><TITLE>Not Found</TITLE>"
+                      "<BODY>File requested isn't found on the server</BODY></HTML>");
     
     return 0;
 }
@@ -315,19 +335,20 @@ int http_not_found(int client)
 
 int http_error(int client)
 {
-    http_send(client, "HTTP/1.1 Bad Request\r\n");
-    http_send(client, "Content-Type: text/html\r\n");
-    http_send(client, "\r\n");
-    http_send(client, "<HTML><TITLE>Bad Request</TITLE>");
-    http_send(client, "<BODY>The resource can't be retrived</BODY></HTML>");
+    //http_send(client, "HTTP/1.1 Bad Request\r\n");
+    //http_send(client, "Content-type: text/html\r\n");
+    //http_send(client, "\r\n");
+    //http_send(client, "<HTML><TITLE>Bad Request</TITLE>");
+    //http_send(client, "<BODY>The resource can't be retrived</BODY></HTML>");
+    
+    http_send(client, "HTTP/1.1 400 Bad Request\r\n"
+                      "Content-Type: text/html\r\n"
+                      "\r\n"
+                      "<HTML><TITLE>Bad Request</TITLE>"
+                      "<BODY>The resource can't be retrived</BODY></HTML>");
 
     return 0;
 }
-
-
-
-
-
 
 
 
@@ -338,26 +359,26 @@ void http_mk_header(int client, int status, char *phrase)
     char buf[MAXLINE];
     sprintf(buf, "HTTP/1.1 %d %s\r\n", status, phrase);
     http_send(client, buf);
-    http_send(client, "Content-Type: text/html\r\n");
+    http_send(client, "Content-type: text/html\r\n");
     http_send(client, "\r\n");
 }
 
 
 int http_send(int client, char *s)
 {
-    char buf[MAXLINE];
-    strncpy(buf, s, MAXLINE);
-    return send(client, buf, strlen(buf)+1, 0);   
-
+    return send(client, s, strlen(s), 0);  
 }
 
 int http_send_file(int client, char *filepath)
 {
     char buf[MAXLINE];
     FILE *f = fopen(filepath, "r");
-
+    struct stat st;
+    stat(filepath, &st);
+    sprintf (buf, "Content-length: %ld\r\n", st.st_size);
     http_send(client, "HTTP/1.1 200 OK\r\n");
-    http_send(client, "Content-Type: text/html\r\n");
+    http_send(client, "Content-type: text/html\r\n");
+    http_send(client, buf);
     http_send(client, "\r\n");
     
     fgets(buf, MAXLINE, f);
@@ -375,7 +396,7 @@ int http_show_dir(int client, char *filepath)
     struct dirent *dirp; struct stat st;
     struct passwd *filepasswd;
     int num = 1;
-    char files[MAXLINE], buf[LINE], name[LINE], img[LINE], mtime[LINE], dir[LINE];
+    char files[MAXLINE], buf[MAXLINE], name[LINE], img[LINE], mtime[LINE], dir[LINE];
     char *p;
 
     p = strrchr(filepath, '/');
@@ -392,5 +413,42 @@ int http_show_dir(int client, char *filepath)
     sprintf (files, "%s<style type = ""text/css""> a:link{text-decoration:none;} </style>", files);
     sprintf (files, "%s<body bgcolor=""ffffff"" font-family=Arial color=#fff font-size=14px}\r\n", files);
 
+    while ((dirp=readdir(dp))!=NULL){
+        if (strcmp(dirp->d_name, ".") == 0 || strcmp(dirp->d_name, "..")==0)
+            continue;
+
+        sprintf (name, "%s/%s", filepath, dirp->d_name);
+        stat(name, &st);
+        filepasswd = getpwuid(st.st_uid);
+
+        if (S_ISDIR(st.st_mode))
+            sprintf (img, "<img src=""dir.png"" width=""24px"" height=""24px"">");
+        else if(S_ISFIFO(st.st_mode))
+            sprintf (img, "<img src=""fifo.png"" width=""24px"" height=""24px"">");
+        else if (S_ISLNK(st.st_mode))
+            sprintf (img, "<img src=""link.png"" width=""24px"" height=""24px"">");
+        else if (S_ISSOCK(st.st_mode))
+            sprintf (img, "<img src=""sock.png"" width=""24px"" height=""24px"">");
+        else 
+            sprintf (img, "<img src=""file.png"" width=""24px"" height=""24px"">");
+
+
+        sprintf (files, "%s<p><pre>%-2d %s ""<a href=%s%s"">%s-15s</a>%-10s%10d %24s</pre></p>\r\n", files, num++, img, dir, dirp->d_name, dirp->d_name, filepasswd->pw_name, (int)st.st_size, tmmodify(st.st_mode, mtime));
+
+        closedir(dp);
+        sprintf (files, "%s</BODY></HTML>", files);
+       
+        sprintf (buf, "HTTP/1.1 200 OK \r\n");
+        sprintf (buf, "%sServer: "SERVER"\r\n", buf);
+        sprintf (buf, "%sContent-length: %ld\r\n", buf, strlen(files));
+        sprintf (buf, "%sContent-type: text/html\r\n", buf);
+        sprintf (buf, "%s\r\n", buf);
+
+        http_send(client, buf);
+
+    }
+
 }
+
+
 
