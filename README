@@ -1,1 +1,4 @@
 It's a simple http server (not complete yet)
+
+
+Dir doc is used for testing "http_show_dir" function
