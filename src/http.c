@@ -215,8 +215,8 @@ int http_analyze(int cfd, threadpool_t *tpool)
 
         if ((S_ISDIR(st.st_mode) || S_ISREG(st.st_mode)) && !iscgi){ 
             struct http_job* job = http_make_job(cfd, filepath);
-            //threadpool_add(tpool, http_thread_work, (void*)job, 0);
-            http_thread_work((void*)job);
+            threadpool_add(tpool, http_thread_work, (void*)job, 0);
+            //http_thread_work((void*)job);
             return 0;
         }else if (S_ISREG(st.st_mode) && iscgi){
             

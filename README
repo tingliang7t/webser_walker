@@ -2,3 +2,22 @@ It's a simple http server (not complete yet)
 
 
 Dir doc is used for testing "http_show_dir" function
+
+MutiProcess and MutiThread(ThreadPool) works well. Walker support cmd option.
+-m on/off  #MutiProcess on or off
+
+-r /path/to/root  #change the default root dir
+
+-c /path/to/cig-bin #change the default cgi dir
+
+-p portnumber   #change the listen port, default to 80 and 
+                #you have to run as root
+
+-l load   #not used yet.Further version will use IPC and the option will be used
+
+-n processnumber
+
+-t timeout  #connection timeout, not used yet
+
+-h threadnumber # threadnumber in ThreadPool, set zero to shutdown ThreadPool 
+
