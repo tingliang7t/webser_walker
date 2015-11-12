@@ -11,6 +11,7 @@
 #include <strings.h>
 #include <fcntl.h>
 #include <sys/epoll.h>
+#include <sys/wait.h>
 extern struct walker walker;
 extern struct config walkerconf[];
 
@@ -47,6 +48,8 @@ int main (int argc, char* argv[])
             do_subprocess_job(walker.fd);
         else{
             /*parent job*/
+            for(;;)
+                wait(NULL);
         }
     } 
 
