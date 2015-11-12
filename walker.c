@@ -102,6 +102,7 @@ int tcp_listen(int port, char *addr, int nlisten)
     }
 
     sockfd = socket(AF_INET, SOCK_STREAM, 0);
+    set_port_reused(sockfd, &seraddr, sizeof(seraddr));
     
     if (bind(sockfd, (struct sockaddr*)&seraddr, sizeof(seraddr)) == -1){
         errlog("tcp_listen: bind failed\n");
@@ -115,8 +116,6 @@ int tcp_listen(int port, char *addr, int nlisten)
         exit(1);
     }
 
-    set_nonblock(sockfd);
-    set_port_reused(sockfd, &seraddr, sizeof(seraddr));
     walker.fd = sockfd;
     return sockfd;
 }
