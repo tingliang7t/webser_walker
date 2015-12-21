@@ -22,6 +22,7 @@ int http_analy(int);
 int http_getline(int, char*, int);
 
 int http_send_file(int, char *);
+int http_getfiletype(char *, char *);
 
 int http_show_dir(int, char *);
 

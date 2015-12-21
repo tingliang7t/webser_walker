@@ -3,6 +3,7 @@
 #include "threadpool.h"
 #include "walker.h"
 
+#include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
@@ -15,6 +16,7 @@
 #include <sys/types.h>
 #include <ctype.h>
 #include <pwd.h>
+#include <sys/mman.h>
 #include <dirent.h>
 
 extern struct config walkerconf[];
@@ -215,8 +217,8 @@ int http_analyze(int cfd, threadpool_t *tpool)
 
         if ((S_ISDIR(st.st_mode) || S_ISREG(st.st_mode)) && !iscgi){ 
             struct http_job* job = http_make_job(cfd, filepath);
-            threadpool_add(tpool, http_thread_work, (void*)job, 0);
-            //http_thread_work((void*)job);
+            //threadpool_add(tpool, http_thread_work, (void*)job, 0);
+            http_thread_work((void*)job);
             return 0;
         }else if (S_ISREG(st.st_mode) && iscgi){
             
@@ -369,10 +371,29 @@ int http_send(int client, char *s)
     return send(client, s, strlen(s), 0);  
 }
 
+int http_getfiletype(char *filename, char *filetype)
+{
+    if (strstr(filename, ".html"))
+        strcpy(filetype, "text/html");
+    else if (strstr(filename, ".gif"))
+        strcpy(filetype, "image/gif");
+    else if (strstr(filename, ".jpg"))
+        strcpy(filetype, "image/jpeg");
+    else if (strstr(filename, "png"))
+        strcpy(filetype, "image/png");
+    else
+        strcpy(filetype, "text/plain");
+
+    return 0;
+        
+    
+}
+
 int http_send_file(int client, char *filepath)
 {
     char buf[MAXLINE];
     char file[MAXLINE];
+    char filetype[20];
     FILE *f = fopen(filepath, "r");
     struct stat st;
     stat(filepath, &st);
@@ -391,12 +412,16 @@ int http_send_file(int client, char *filepath)
         sprintf(file, "%s%s", file, buf);
     }
     
-    sprintf (buf, "Content-length: %ld\r\n", st.st_size);
-    http_send(client, "HTTP/1.1 200 OK\r\n");
-    http_send(client, "Content-type: text/html\r\n");
+    
+    http_getfiletype(filepath, filetype);
+    sprintf(buf, "HTTP/1.0 200 OK\r\n");
+    sprintf (buf, "%sContent-type: %s\r\n",buf, filetype);
+    sprintf (buf, "%sContent-length: %ld\r\n\r\n",buf, st.st_size);
     http_send(client, buf);
-    http_send(client, "\r\n");
-    http_send(client, file);
+
+    char *src=(char*)mmap(0, st.st_size, PROT_READ, MAP_PRIVATE, fileno(f), 0);
+    fclose(f);
+    send(client, src, st.st_size,0);
     return 0;
 }
 
@@ -448,7 +473,7 @@ int http_show_dir(int client, char *filepath)
     closedir(dp);
     sprintf (files, "%s</BODY></HTML>", files);
        
-    sprintf (buf, "HTTP/1.1 200 OK \r\n");
+    sprintf (buf, "HTTP/1.0 200 OK \r\n");
     sprintf (buf, "%sServer: "SERVER"\r\n", buf);
     sprintf (buf, "%sContent-length: %ld\r\n", buf, strlen(files));
     sprintf (buf, "%sContent-type: text/html\r\n", buf);
