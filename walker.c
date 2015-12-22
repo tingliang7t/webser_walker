@@ -3,6 +3,8 @@
 #include "threadpool.h"
 #include "fdopt.h"
 #include "conf.h"
+#include "db.h"
+
 
 #include <sys/epoll.h>
 #include <unistd.h>
@@ -27,6 +29,8 @@ extern struct config walkerconf[];
 #define RW_RW_RW (S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH)
 
 int epollfd;
+extern FILE * elog;
+extern DBHANDLE walker_db;
 
 
 void init_daemon()
@@ -57,13 +61,18 @@ void init_daemon()
         close(i);
     
     walker.errlog = fopen(walkerconf[LOGFILE].value ,"a");
+    elog = walker.errlog;
     walker.stime = time(NULL);
     //int fd = creat("walker.pid", RW_RW_RW);
     pid = getpid();
     creat("walker.pid", S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
     FILE *f = fopen("walker.pid", "w");
     fprintf(f, "%d", pid);
+
+    
+    walker_db = db_open("walker", O_RDWR|O_APPEND|O_CREAT, RW_RW_RW); 
     chdir("/");
+
     
 }
 
@@ -227,7 +236,7 @@ void do_subprocess_job(int serfd)
                 if (clifd == -1)/*connected has been established by other process*/
                     continue;
                 ev.data.fd = clifd;
-                ev.events = EPOLLIN | EPOLLONESHOT;
+                ev.events = EPOLLIN | EPOLLET;
                 //ev.events = EPOLLIN;
                 epoll_ctl(epollfd, EPOLL_CTL_ADD, clifd, &ev);
             }else if (ea[i].events & EPOLLIN){

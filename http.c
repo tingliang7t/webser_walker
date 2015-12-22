@@ -2,6 +2,7 @@
 #include "conf.h"
 #include "threadpool.h"
 #include "walker.h"
+#include "db.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -14,6 +15,7 @@
 #include <sys/stat.h>
 #include <sys/epoll.h>
 #include <sys/types.h>
+#include <sys/wait.h>
 #include <ctype.h>
 #include <pwd.h>
 #include <sys/mman.h>
@@ -21,12 +23,16 @@
 
 extern struct config walkerconf[];
 extern int epollfd;
+extern DBHANDLE walker_db;
+
 
 #define MAXLINE     65535
 #define LINE        1024
 #define MAXURL      4096
 #define MAXQUERY    4096
 #define SERVER      "Walker"
+
+char postdata[MAXLINE];
 
 void http_handle(int client, threadpool_t *tpool, int epollfd)
 {
@@ -182,7 +188,7 @@ int http_analyze(int cfd, threadpool_t *tpool)
     }
     
     sscanf(line, "%s %s %s", method, url, version);
-
+    
     if (strncasecmp(method, "GET", 3) !=0 && strncasecmp(method, "POST", 4) !=0){
         http_not_support(cfd);
         return 0;
@@ -196,6 +202,17 @@ int http_analyze(int cfd, threadpool_t *tpool)
         *pos='\0'; pos++;
         strncpy(query, pos, strlen(pos)+1);
     } 
+    
+    /*
+    struct sockaddr_in addr;
+    socklen_t socklen;
+    getsockname(cfd, (struct sockaddr*)&addr, &socklen);
+    char *buf = (char*)malloc(20);
+    buf=inet_ntoa(addr.sin_addr);
+    db_store(walker_db, (const char*)buf, (const char*)url, DB_INSERT);
+    free(buf); 
+    */
+    
 
     if (strncasecmp(method, "GET", 3)==0){
         char *filepath;
@@ -227,7 +244,69 @@ int http_analyze(int cfd, threadpool_t *tpool)
             return 0;
         }         
     }else if (strncasecmp(method, "POST", 4) == 0){
-         
+        int pi[2], pid, content_length;
+        char *p; 
+        char *filepath;
+
+        filepath = (char *)malloc(strlen(walkerconf[ROOT].value)+strlen(url)+1);
+        content_length=-1;
+        
+        while((ret=http_getline(cfd, line, MAXLINE)) !=0){
+            if (strncasecmp(line, "Content-Length:", 15) == 0){
+                p = &line[15];
+                p += strspn(p, " \t");
+                content_length = atoi(p);
+            }
+                                       
+        }
+
+        if (content_length != -1){
+            recv(cfd, postdata, content_length, 0);   
+        }
+
+        socketpair(AF_UNIX, SOCK_STREAM, 0, pi);
+        
+        pid = fork();
+
+        if (pid==0){
+            dup2(pi[0], 0);
+            dup2(pi[1], 1);
+
+            close(pi[0]);
+            close(pi[1]);
+
+            char meth_env[255];
+            char length_env[255];
+
+            sprintf (meth_env, "REQUEST_METHOD=%s", method);
+            putenv(meth_env);
+            
+            sprintf (length_env, "CONTENT_LENGTH=%d", content_length);
+            putenv(length_env);
+
+            execl(filepath, filepath, NULL);
+            exit(0);
+        }else{
+            char recvdata[MAXLINE], packet[MAXLINE];
+            write(pi[0], postdata, content_length);
+
+            if ((ret = read(pi[0], recvdata, MAXLINE))>0){
+                recvdata[ret]='\0';
+                sprintf(packet, "HTTP/1.0 200 OK\r\n");
+                sprintf(packet, "%sContent-Type: text/html\r\n", packet);
+                sprintf(packet, "%sContent-Length: %d\r\n\r\n", packet, ret);
+                sprintf(packet, "%s%s", packet, recvdata);
+                send(cfd, packet, MAXLINE, 0);
+            }
+                
+
+            close(pi[0]);
+            close(pi[1]);
+
+            waitpid(pid, NULL, 0);
+        }
+            
+        
     }
     
     return 0;
@@ -422,6 +501,7 @@ int http_send_file(int client, char *filepath)
     char *src=(char*)mmap(0, st.st_size, PROT_READ, MAP_PRIVATE, fileno(f), 0);
     fclose(f);
     send(client, src, st.st_size,0);
+    munmap(src, st.st_size);
     return 0;
 }
 

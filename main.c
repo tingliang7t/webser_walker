@@ -2,6 +2,8 @@
 #include "conf.h"
 #include "fdopt.h"
 #include "threadpool.h"
+#include "db.h"
+
 
 #include <unistd.h>
 #include <stddef.h>
@@ -18,6 +20,7 @@ extern struct config walkerconf[];
 #define QUESIZE 10
 
 int epollfd;
+DBHANDLE walker_db;
 
 int main (int argc, char* argv[])
 {
@@ -26,8 +29,7 @@ int main (int argc, char* argv[])
     init_file_config();
     init_opt_config(argc, argv);
 
-    init_daemon();
-    
+    init_daemon(); 
     int port = atoi(walkerconf[PORT].value);
     int nlisten = atoi(walkerconf[LISTENNUMBER].value);
     walker.fd = tcp_listen(port,/*address*/ NULL, nlisten);
