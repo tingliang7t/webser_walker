@@ -34,7 +34,7 @@ static void     _db_writeptr(DB*, off_t, off_t);
 FILE *elog;
 void dberrlog(FILE *fp, char *s)
 {   
-    fprintf(fp, "%s", s);
+    fprintf(fp, "%s\n", s);
     exit(1);
 }
 
@@ -53,7 +53,7 @@ db_open(const char *pathname, int oflag, ...)
 
     len = strlen(pathname);
     if ((db = _db_alloc(len)) == NULL){
-        printf("db_open: _db_alloc error of DB");
+        printf("db_open: _db_alloc error of DB\n");
         exit(1);
     }
 
@@ -85,12 +85,12 @@ db_open(const char *pathname, int oflag, ...)
     if ((oflag & (O_CREAT | O_TRUNC))  == (O_CREAT | O_TRUNC)){
         if (writew_lock(db->idxfd, 0, SEEK_SET, 0) < 0){
             printf ("%s: writew_lock error\n", __FUNCTION__);
-            exit(1);
+            //exit(1);
         }
 
         if (fstat(db->idxfd, &statbuff)){
             printf ("%s: fstat error\n", __FUNCTION__);
-            exit(1);
+            //exit(1);
         }
 
         if (statbuff.st_size == 0){
@@ -124,7 +124,7 @@ db_open(const char *pathname, int oflag, ...)
 
         if (un_lock(db->idxfd, 0, SEEK_SET, 0) < 0){
             printf ("%s: un_lock error\n", __FUNCTION__);
-            exit(1);
+            //exit(1);
         }
             
     }
@@ -144,15 +144,15 @@ _db_alloc(int namelen)
 {
     DB *db;
     if ((db=calloc(1, sizeof(DB))) == NULL)
-        printf ("__db_alloc: calloc error for DB");
+        printf ("__db_alloc: calloc error for DB\n");
     db->idxfd = db->datfd = -1;
 
     if((db->name = (char *)malloc(namelen+5)) == NULL)
-        dberrlog(elog, "_db_alloc: malloc error for name");
+        dberrlog(elog, "_db_alloc: malloc error for name\n");
     if((db->idxbuf = (char *)malloc(IDXLEN_MAX+2)) == NULL)
-        dberrlog(elog, "_db_alloc: malloc error for index buffer");
+        dberrlog(elog, "_db_alloc: malloc error for index buffer\n");
     if((db->datbuf = malloc(DATLEN_MAX+2)) == NULL)
-        dberrlog(elog, "_db_alloc: malloc error for data buffer");
+        dberrlog(elog, "_db_alloc: malloc error for data buffer\n");
     return(db);
 }
 
@@ -232,7 +232,7 @@ _db_find_and_lock(DB *db, const char *key, int writelock)
     db->ptroff = db->chainoff;
 
     if (writelock){
-        if (write_lock(db->idxfd, db->chainoff, SEEK_SET, 1) < 0)
+        if (writew_lock(db->idxfd, db->chainoff, SEEK_SET, 1) < 0)
             dberrlog(elog, "_db_find_and_lock: writew_lock error");
     }else{
         if (readw_lock(db->idxfd, db->chainoff, SEEK_SET, 1)<0)

@@ -52,6 +52,11 @@ int main (int argc, char* argv[])
             /*parent job*/
             for(;;)
                 wait(NULL);
+                errlog("A child terminated");
+                int pid = fork();
+                if (pid == 0){
+                    do_subprocess_job(walker.fd);
+                }
         }
     } 
 

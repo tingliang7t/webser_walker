@@ -105,3 +105,24 @@ Tue Dec 22 18:18:42 2015
 tcp_listen: bind failed
 _db_readptr: read error of ptr fieldTue Dec 22 21:23:40 2015
 tcp_listen: bind failed
+_db_readidx: missing newline_db_readidx: missing newline_db_readidx: missing newlineWed Dec 23 02:36:15 2015
+tcp_listen: bind failed
+_db_readidx: missing newline_db_readidx: missing newline_db_readidx: missing newline_db_readidx: missing newline_db_readidx: missing newlineWed Dec 23 03:26:14 2015
+http_analyze ip:0.0.0.0 create an error connection_db_readidx: missing newline_db_readidx: missing newline_db_readidx: missing newline_db_readidx: missing newline_db_readidx: missing newline_db_readidx: missing newline_db_readidx: missing newline_db_readidx: missing newline
+Wed Dec 23 05:58:05 2015
+tcp_listen: bind failed
+_db_readidx: missing newline
+_db_readidx: missing newline
+_db_readidx: missing newline
+_db_readidx: missing newline
+_db_readidx: missing newline
+_db_readidx: missing newline
+_db_readidx: missing newline
+Wed Dec 23 08:26:30 2015
+tcp_listen: bind failed
+
+_db_readidx: missing newline
+Wed Dec 23 08:32:01 2015
+tcp_listen: bind failed
+
+_db_readidx: missing newline

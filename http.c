@@ -19,6 +19,7 @@
 #include <ctype.h>
 #include <pwd.h>
 #include <sys/mman.h>
+#include <time.h>
 #include <dirent.h>
 
 extern struct config walkerconf[];
@@ -32,6 +33,9 @@ extern DBHANDLE walker_db;
 #define MAXQUERY    4096
 #define SERVER      "Walker"
 
+
+
+
 char postdata[MAXLINE];
 
 void http_handle(int client, threadpool_t *tpool, int epollfd)
@@ -40,7 +44,7 @@ void http_handle(int client, threadpool_t *tpool, int epollfd)
     epoll_ctl(epollfd, EPOLL_CTL_DEL, client, NULL);
     //close(client);
     if (strcasecmp(walkerconf[THREADNUMBER].value, "0") == 0)
-        shutdown(client, SHUT_RDWR);
+        close(client);
 }
 
 
@@ -203,15 +207,20 @@ int http_analyze(int cfd, threadpool_t *tpool)
         strncpy(query, pos, strlen(pos)+1);
     } 
     
-    /*
+   
     struct sockaddr_in addr;
     socklen_t socklen;
     getsockname(cfd, (struct sockaddr*)&addr, &socklen);
-    char *buf = (char*)malloc(20);
-    buf=inet_ntoa(addr.sin_addr);
-    db_store(walker_db, (const char*)buf, (const char*)url, DB_INSERT);
-    free(buf); 
-    */
+    
+    time_t t = time(NULL);
+    char* tmpbuf = (char*)malloc(50);
+    sprintf (tmpbuf, "%s----", ctime(&t));
+    sprintf (tmpbuf, "%sIP:%s", tmpbuf, inet_ntoa(addr.sin_addr));
+    
+    db_store(walker_db, (const char*)tmpbuf, (const char*)url, DB_INSERT);
+    
+    free(tmpbuf);
+    
     
 
     if (strncasecmp(method, "GET", 3)==0){
@@ -219,6 +228,9 @@ int http_analyze(int cfd, threadpool_t *tpool)
         filepath = (char *)malloc(strlen(walkerconf[ROOT].value)+strlen(url)+1);
         strcpy(filepath, walkerconf[ROOT].value);
         strcat(filepath, url);
+
+
+        while((ret = http_getline(cfd, line, MAXLINE))>0);
 
 
         struct stat st;
@@ -249,6 +261,8 @@ int http_analyze(int cfd, threadpool_t *tpool)
         char *filepath;
 
         filepath = (char *)malloc(strlen(walkerconf[ROOT].value)+strlen(url)+1);
+        strcpy(filepath, walkerconf[ROOT].value);
+        strcat(filepath, url);
         content_length=-1;
         
         while((ret=http_getline(cfd, line, MAXLINE)) !=0){
@@ -284,7 +298,7 @@ int http_analyze(int cfd, threadpool_t *tpool)
             sprintf (length_env, "CONTENT_LENGTH=%d", content_length);
             putenv(length_env);
 
-            execl(filepath, filepath, NULL);
+            execl("/usr/bin/php-cgi", "php-cgi", filepath, NULL);
             exit(0);
         }else{
             char recvdata[MAXLINE], packet[MAXLINE];
@@ -292,17 +306,21 @@ int http_analyze(int cfd, threadpool_t *tpool)
 
             if ((ret = read(pi[0], recvdata, MAXLINE))>0){
                 recvdata[ret]='\0';
-                sprintf(packet, "HTTP/1.0 200 OK\r\n");
-                sprintf(packet, "%sContent-Type: text/html\r\n", packet);
+                
+                
+                
+                //sprintf(packet, "%sContent-Type: text/html\r\n", packet);
+                sprintf(packet, "HTTP/1.1 200 OK\r\n");
                 sprintf(packet, "%sContent-Length: %d\r\n\r\n", packet, ret);
                 sprintf(packet, "%s%s", packet, recvdata);
                 send(cfd, packet, MAXLINE, 0);
+                 
+                //send(cfd, recvdata, MAXLINE, 0);
             }
                 
-
             close(pi[0]);
             close(pi[1]);
-
+            free(filepath);
             waitpid(pid, NULL, 0);
         }
             
@@ -476,20 +494,15 @@ int http_send_file(int client, char *filepath)
     FILE *f = fopen(filepath, "r");
     struct stat st;
     stat(filepath, &st);
-   /* 
-    fgets(buf, MAXLINE, f);
-    while(!feof(f)){
-        send(client, buf, strlen(buf), 0);
-        fgets(buf, MAXLINE, f);
-    }
-    */
-
+   
+    /*
     fgets(buf, MAXLINE, f);
     sprintf (file, "%s", buf);
     while(!feof(f)){
         fgets(buf, MAXLINE, f);
         sprintf(file, "%s%s", file, buf);
     }
+    */
     
     
     http_getfiletype(filepath, filetype);

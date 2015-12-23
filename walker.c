@@ -68,9 +68,15 @@ void init_daemon()
     creat("walker.pid", S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
     FILE *f = fopen("walker.pid", "w");
     fprintf(f, "%d", pid);
+    fclose(f);
 
     
-    walker_db = db_open("walker", O_RDWR|O_APPEND|O_CREAT, RW_RW_RW); 
+    if (access("walker.idx", F_OK) == 0)
+        walker_db =  db_open("walker", O_RDWR);
+    else
+        walker_db = db_open("walker", O_RDWR|O_CREAT|O_TRUNC, RW_RW_RW); 
+    
+    
     chdir("/");
 
     
@@ -84,7 +90,7 @@ void errlog(char *string)
 {
     time_t tm = time(NULL);
 
-    fprintf (walker.errlog, "%s" "%s",  asctime(localtime(&tm)), string);
+    fprintf (walker.errlog, "%s" "%s\n",  asctime(localtime(&tm)), string);
 }
 
 
